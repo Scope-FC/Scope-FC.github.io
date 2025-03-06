@@ -163,14 +163,23 @@
             try {
                 const response = await fetch(jsonPaths[currentGroupIndex]);
                 const data = await response.json();
-
-                // 更新组标签
                 document.getElementById('group-value').textContent = data[0].Group;
+                // 保存当前数据集引用
+                // 预处理数据：四舍五入到小数点后两位
+                const currentDataSet = data.map(item => ({
+                    英雄: item.英雄,
+                    出场率: Math.round(item.出场率 * 1000) / 1000, // 保留3位小数
+                    winrate: Math.round(item.winrate * 1000) / 1000,
+                    // 添加其他需要展示的字段
+                    banrate: item.banrate ? (item.banrate * 100).toFixed(1) + '%' : 'N/A',
+                    KDA: item.KDA ? item.KDA.toFixed(1) : 'N/A',
+                }));
 
-                // 准备散点图数据
-                const scatterData = data.map(item => ({
+                // 生成散点图数据
+                const scatterData = currentDataSet.map(item => ({
                     name: item.英雄,
                     value: [item.出场率 * 100, item.winrate * 100],
+                    rawData: item,
                     itemStyle: {
                         color: getColorByWinrate(item.winrate)
                     }
@@ -186,12 +195,75 @@
                         },
                     },
                     tooltip: {
+                        trigger: 'item',
                         formatter: function (params) {
-                            return `${params.name}<br/>
-                            出场率：${params.value[0].toFixed(1)}%<br/>
-                            胜率：${params.value[1].toFixed(1)}%`;
+                            const [x, y] = params.value;
+
+                            // 查找匹配点（扩大容差范围）
+                            const samePoints = scatterData.filter(point =>
+                                Math.abs(point.value[0] - x) < 2 && // 2% 容差
+                                Math.abs(point.value[1] - y) < 2
+                            );
+
+                            // 按出场率排序
+                            samePoints.sort((a, b) => b.rawData.出场率 - a.rawData.出场率);
+
+                            // 构建多列布局
+                            let content = `<div style="
+            max-width: min(600px, 90vw);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            padding: 8px;
+        ">`;
+
+                            samePoints.forEach((p, index) => {
+                                content =content+ `
+                <div style="
+                    background: rgba(0, 0, 0, 0.8);
+                    border: 1px solid #c8aa6e;
+                    border-radius: 4px;
+                    padding: 8px;
+                ">
+                    <div style="
+                        color: #ffd700;
+                        font-weight: bold;
+                        margin-bottom: 4px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    ">${p.name}</div>
+                    <div style="font-size: 0.9em; line-height: 1.4;">
+                        <div>选取率:${(p.rawData.出场率 * 100).toFixed(1)}%</div>
+                        <div>胜率:${(p.rawData.winrate * 100).toFixed(1)}%</div>
+                        <div>禁用率:${p.rawData.banrate}</div>
+                        <div>KDA:${p.rawData.KDA}</div>
+
+                    </div>
+                </div>
+            `;
+                            });
+
+                            content += `</div>`;
+                            return content;
+                        },
+                        extraCssText: `
+        padding: 12px !important;
+        background: rgba(0, 0, 0, 0.9) !important;
+        border: 2px solid #c8aa6e !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        max-height: 400px;
+        overflow-y: auto;
+    `,
+                        axisPointer: {
+                            type: 'cross',
+                            label: {
+                                backgroundColor: '#6a7985'
+                            }
                         }
-                    },
+                    }
+                    ,
                     xAxis: {
                         name: '选取率 (%)',
                         nameLocation: 'center',
@@ -229,16 +301,17 @@
                         symbolSize: 20,
                         data: scatterData,
                         emphasis: {
+                            focus: 'self', // 只高亮当前系列
                             itemStyle: {
-                                shadowBlur: 10,
-                                shadowColor: 'rgba(255,215,0,0.5)'
+                                shadowBlur: 20,
+                                shadowColor: 'rgba(255,215,0,0.8)'
                             }
                         }
                     }],
                     visualMap: {
-                        show: false,
-                        min: 40,
-                        max: 60,
+                        show: false,  // 不需要显示
+                        min: 0,       // 全范围
+                        max: 100,
                         inRange: {
                             color: ['#ff4444', '#ffd700', '#44ff44']
                         }
@@ -264,14 +337,15 @@
             initScatterChart();
 
             // 组选择器交互（修改后）
+            // 取消注释stopPropagation
             groupSelector.addEventListener('click', function (e) {
-                //e.stopPropagation();
+                e.stopPropagation();
                 toggleGroupMenu();
             });
 
             document.querySelectorAll('.group-option').forEach(option => {
                 option.addEventListener('click', function (e) {
-                    //e.stopPropagation();
+                    e.stopPropagation();  // 增加阻止冒泡
                     currentGroupIndex = parseInt(this.dataset.group);
                     loadScatterData();
                     closeGroupMenu();
