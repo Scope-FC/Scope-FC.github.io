@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>英雄联盟数据看板</title>
+    <script src="https://cdn.staticfile.org/echarts/5.4.2/echarts.min.js"></script>
+    <style>
+        /* 保持原有样式不变 */
+        #title {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            font-family: 'FZDeSaiHeiS 510M';
+            color: #c8aa6e;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 0;
+            z-index: 1000;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1c1e2a, #2a2d3d);
+            color: #fff;
+            min-height: 70vh;
+            overflow: hidden;
+        }
+
+        /* 新增散点图容器样式 */
+        #scatter-chart {
+            width: 90%;
+            height: 75vh;
+            margin-top: 160px;
+            margin-left: 5%;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        /* 调整组标签位置到左上角 */
+        #group-label {
+            position: fixed;
+            left: 20px;
+            top: 100px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            font-family: '.PingFang SC';
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            z-index: 1000;
+        }
+
+        #group-label .group-selector {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            padding: 8px 12px;
+            /* 增加内边距，扩大点击区域 */
+            border-radius: 4px;
+            /* 可选：增加圆角 */
+            background: rgba(255, 215, 0, 0.1);
+            /* 可选：增加背景色，方便调试 */
+        }
+
+        #group-label .group-options {
+            display: none;
+            position: absolute;
+            /*top: 100%; /* 调整下拉菜单的位置 */
+            transform: translateX(-50%);
+            /* 居中显示 */
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            border-radius: 4px;
+            padding: 5px 10px;
+            z-index: 2000;
+            flex-direction: column;
+            /* 横向排列 */
+            gap: 10px;
+            /* 选项之间的间距 */
+            white-space: nowrap;
+            /* 防止换行 */
+        }
+
+        #group-label .group-option {
+            padding: 8px 12px;
+            color: #ffd700;
+            cursor: pointer;
+            white-space: nowrap;
+            /* 防止文字换行 */
+        }
+
+        #group-label .group-option:hover {
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .group-options.show {
+            display: flex !important;
+        }
+
+        /* 隐藏不需要的元素 */
+        .nav-button,
+        #header,
+        .chart-container {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="title">出场英雄选胜比</div>
+    <div id="group-label">
+        Group:
+        <div class="group-selector">
+            <span id="group-value"></span>
+            <div class="group-options">
+                <div class="group-option" data-group="0">Group A</div>
+                <div class="group-option" data-group="1">Group B</div>
+                <div class="group-option" data-group="2">Group C</div>
+                <div class="group-option" data-group="3">Group D</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="scatter-chart"></div>
+
+    <script>
+        let scatterChart;
+        let currentGroupIndex = 0;
+        const jsonPaths = [
+            'LOLData-2025-Split1-GroupA.json',
+            'LOLData-2025-Split1-GroupB.json',
+            'LOLData-2025-Split1-GroupC.json',
+            'LOLData-2025-Split1-GroupD.json'
+        ];
+
+        const groupSelector = document.querySelector('.group-selector');
+        const groupOptions = document.querySelector('.group-options');
+
+        function toggleGroupMenu() {
+            groupOptions.classList.toggle('show');
+        }
+
+        function closeGroupMenu() {
+            groupOptions.classList.remove('show');
+        }
+
+        // 初始化图表
+        function initScatterChart() {
+            scatterChart = echarts.init(document.getElementById('scatter-chart'));
+        }
+
+        // 加载数据并渲染图表
+        async function loadScatterData() {
+            try {
+                const response = await fetch(jsonPaths[currentGroupIndex]);
+                const data = await response.json();
+
+                // 更新组标签
+                document.getElementById('group-value').textContent = data[0].Group;
+
+                // 准备散点图数据
+                const scatterData = data.map(item => ({
+                    name: item.英雄,
+                    value: [item.出场率 * 100, item.winrate * 100],
+                    itemStyle: {
+                        color: getColorByWinrate(item.winrate)
+                    }
+                }));
+
+                const option = {
+                    title: {
+                        text: '英雄数据分布',
+                        left: 'center',
+                        textStyle: {
+                            color: '#ffd700',
+                            fontSize: 20
+                        },
+                    },
+                    tooltip: {
+                        formatter: function (params) {
+                            return `${params.name}<br/>
+                            出场率：${params.value[0].toFixed(1)}%<br/>
+                            胜率：${params.value[1].toFixed(1)}%`;
+                        }
+                    },
+                    xAxis: {
+                        name: '选取率 (%)',
+                        nameLocation: 'center',
+                        nameGap: 30,
+                        min: 0,
+                        max: 100,
+                        axisLine: {
+                            lineStyle: {
+                                color: '#fff'
+                            }
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: 'rgba(255,255,255,0.1)'
+                            }
+                        },
+                    },
+                    yAxis: {
+                        name: '胜率 (%)',
+                        min: 0,
+                        max: 100,
+                        axisLine: {
+                            lineStyle: {
+                                color: '#fff'
+                            }
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: 'rgba(255,255,255,0.1)'
+                            }
+                        }
+                    },
+                    series: [{
+                        type: 'scatter',
+                        symbolSize: 20,
+                        data: scatterData,
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowColor: 'rgba(255,215,0,0.5)'
+                            }
+                        }
+                    }],
+                    visualMap: {
+                        show: false,
+                        min: 40,
+                        max: 60,
+                        inRange: {
+                            color: ['#ff4444', '#ffd700', '#44ff44']
+                        }
+                    }
+                };
+
+                scatterChart.setOption(option);
+            } catch (error) {
+                console.error('数据加载失败:', error);
+            }
+        }
+
+        // 根据胜率生成颜色
+        function getColorByWinrate(winrate) {
+            const percentage = winrate * 100;
+            if (percentage < 45) return '#ff4444';
+            if (percentage < 55) return '#ffd700';
+            return '#44ff44';
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initScatterChart();
+
+            // 组选择器交互（修改后）
+            groupSelector.addEventListener('click', function (e) {
+                //e.stopPropagation();
+                toggleGroupMenu();
+            });
+
+            document.querySelectorAll('.group-option').forEach(option => {
+                option.addEventListener('click', function (e) {
+                    //e.stopPropagation();
+                    currentGroupIndex = parseInt(this.dataset.group);
+                    loadScatterData();
+                    closeGroupMenu();
+                });
+            });
+
+            // 点击页面其他位置关闭菜单
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('.group-selector')) {
+                    closeGroupMenu();
+                }
+            });
+
+            // 初始加载数据
+            loadScatterData();
+        });
+
+        // 窗口自适应
+        window.addEventListener('resize', () => {
+            scatterChart.resize();
+        });
+    </script>
+</body>
+
+</html>

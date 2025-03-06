@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>英雄联盟数据看板</title>
+    <script src="https://cdn.staticfile.org/echarts/5.4.2/echarts.min.js"></script>
+    <style>
+        /* 新增标题样式 */
+        #title {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            font-family: 'FZDeSaiHeiS 510M';
+            color: #c8aa6e;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 0;
+            z-index: 1000; /* 确保标题在最上层 */
+            border-bottom: 2px solid rgba(255, 215, 0, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1c1e2a, #2a2d3d);
+            color: #fff;
+            min-height: 70vh;
+        /*    overflow: hidden; /* 禁止滚动 */
+        }
+
+        #header {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            z-index: 100;
+        }
+
+        #hero-name {
+            font-size: 24px;
+            font-family: '.PingFang SC';
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+
+        #hero-pickrate {
+            font-size: 16px;
+            font-family: '.PingFang SC';
+            color: #c4a484;
+        }
+
+        #group-label {
+            position: fixed;
+            left: auto ;
+            top: 100px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            font-family: '.PingFang SC';
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        #group-label .group-selector {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            padding: 8px 12px; /* 增加内边距，扩大点击区域 */
+            border-radius: 4px; /* 可选：增加圆角 */
+            background: rgba(255, 215, 0, 0.1); /* 可选：增加背景色，方便调试 */
+        }
+
+        #group-label .group-options {
+            display: none;
+            position: absolute;
+            /*top: 100%; /* 调整下拉菜单的位置 */
+            transform: translateX(-50%); /* 居中显示 */
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            border-radius: 4px;
+            padding: 5px 10px;
+            z-index: 2000;
+            flex-direction: row; /* 横向排列 */
+            gap: 10px; /* 选项之间的间距 */
+            white-space: nowrap; /* 防止换行 */
+        }
+
+        #group-label .group-option {
+            padding: 8px 12px;
+            color: #ffd700;
+            cursor: pointer;
+            white-space: nowrap; /* 防止文字换行 */
+        }
+
+        #group-label .group-option:hover {
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .nav-button {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            color: #ffd700;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .nav-button:hover {
+            background: rgba(255, 215, 0, 0.2);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        #prev-btn {
+            left: 20px;
+        }
+
+        #next-btn {
+            right: 20px;
+        }
+
+        .chart-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-top: 200px;
+            overflow: hidden; /* 禁止滚动 */
+        }
+
+        .chart-box {
+            flex: 1;
+            min-width: 600px;
+            height: 600px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 12px;
+            overflow: hidden; /* 禁止滚动 */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #hero-name {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #hero-name:hover {
+            text-shadow: 0 0 10px #ffd700;
+        }
+
+        .hero-list {
+            display: none;
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 200;
+        }
+
+        .hero-option {
+            padding: 8px 12px;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .hero-option:hover {
+            background: rgba(255, 215, 0, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="title">出场英雄战力图</div>
+    <div id="header">
+        <div id="hero-name"></div>
+        <div id="hero-pickrate"></div>
+    </div>
+
+    <div class="nav-button" id="prev-btn">◄</div>
+    <div class="nav-button" id="next-btn">►</div>
+
+    <div class="chart-container">
+        <div class="chart-box" id="radar-chart"></div>
+        <div class="chart-box" id="bar-chart"></div>
+    </div>
+
+    <div id="hero-list" class="hero-list"></div>
+
+    <div id="group-label">
+        Group: 
+        <div class="group-selector">
+            <span id="group-value"></span>
+            <div class="group-options">
+                <div class="group-option" data-group="0">Group A</div>
+                <div class="group-option" data-group="1">Group B</div>
+                <div class="group-option" data-group="2">Group C</div>
+                <div class="group-option" data-group="3">Group D</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 定义全局变量
+        let heroData = [];
+        let currentIndex = 0;
+        let chartIndex = 0;
+        let radarChart, barChart;
+        let path = [
+            'LOLData-2025-Split1-GroupA.json',
+            'LOLData-2025-Split1-GroupB.json',
+            'LOLData-2025-Split1-GroupC.json',
+            'LOLData-2025-Split1-GroupD.json'
+        ];
+        // 初始化图表实例
+        function initCharts() {
+            if (radarChart) radarChart.dispose();
+            if (barChart) barChart.dispose();
+            radarChart = echarts.init(document.getElementById('radar-chart'));
+            barChart = echarts.init(document.getElementById('bar-chart'));
+        }
+
+        // 加载JSON数据
+        async function loadData() {
+            try {
+                const response = await fetch(path[chartIndex]);
+                heroData = await response.json();
+                currentIndex = 0;
+                initCharts();
+                updateCharts(currentIndex);
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                alert('无法加载数据，请检查网络连接或数据文件');
+            }
+        }
+
+        function updateHeader(hero) {
+            document.getElementById('hero-name').textContent = hero.英雄;
+            document.getElementById('hero-pickrate').textContent = `出场率：${(hero.出场率 * 100).toFixed(1)}%`;
+        }
+
+        function updateCharts(index) {
+            const data = heroData[index];
+
+            // 更新头部信息
+            updateHeader(data);
+            document.getElementById('group-value').textContent = data.Group;
+
+            // 雷达图配置
+            const radarOption = {
+                title: {
+                    text: `${data.英雄} - 核心数据`,
+                    left: 'center',
+                    textStyle: {
+                        color: '#ffd700',
+                        fontSize: 18
+                    }
+                },
+                radar: {
+                    indicator: [
+                        { name: `选取率<30%\n${data.pickrate.toFixed(1)*100}%`, max: 30 },
+                        { name: `禁用率<30%\n${data.banrate.toFixed(1)*100}%`, max: 30 },
+                        { name: `胜率\n${data.winrate.toFixed(1)*100}%`, max: 100 },
+                        { name: `击杀\n${data.kill.toFixed(1)}`, max: 10 },
+                        { name: `死亡\n${data.death.toFixed(1)}`, max: 10 },
+                        { name: `助攻\n${data.assist.toFixed(1)}`, max: 10 },
+                        { name: `一血率\n${(data.FB * 100).toFixed(1)}%`, max: 1 },
+                        { name: `一塔率\n${(data.FT * 100).toFixed(1)}%`, max: 1 }
+                    ],
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        }
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    },
+                    axisLabel: {
+                        color: '#fff',
+                        fontSize: 12
+                    }
+                },
+                series: [{
+                    type: 'radar',
+                    data: [{
+                        value: [
+                            data.pickrate*100,
+                            data.banrate*100,
+                            data.winrate*100,
+                            data.kill,
+                            data.death,
+                            data.assist,
+                            data.FB,
+                            data.FT
+                        ],
+                        name: '核心数据',
+                        areaStyle: {
+                            color: 'rgba(255, 215, 0, 0.3)'
+                        },
+                        lineStyle: {
+                            color: '#ffd700',
+                            width: 2
+                        },
+                        itemStyle: {
+                            color: '#ffd700'
+                        }
+                    }]
+                }]
+            };
+
+             // 柱状图配置（添加第二个Y轴）
+             const barOption = {
+                title: {
+                    text: '详细数据统计',
+                    left: 'center',
+                    textStyle: {
+                        color: '#ffd700',
+                        fontSize: 18
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['KDA', 'DPM', 'DTPM', 'GPM'],
+                    axisLabel: {
+                        color: '#fff',
+                        fontSize: 14
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        }
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '常规数据',
+                        nameTextStyle: {
+                            color: '#c4a484'
+                        },
+                        axisLabel: {
+                            color: '#fff',
+                            fontSize: 12
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        position: 'right'
+                    },
+                    {
+                        type: 'value',
+                        name: 'KDA',
+                        nameTextStyle: {
+                            color: '#ffd700'
+                        },
+                        axisLabel: {
+                            color: '#ffd700',
+                            fontSize: 12
+                        },
+                        splitLine: {
+                            show: false
+                        },
+                        position: 'left'
+                    }
+                ],
+                series: [
+                {
+                        name: 'KDA',
+                        type: 'bar',
+                        yAxisIndex: 1, // 使用第二个Y轴
+                        data: [
+                            data.KDA,
+                            null,
+                            null,
+                            null
+                        ],
+                        barWidth: '40%',
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(
+                                0, 0, 0, 1,
+                                [
+                                    {offset: 0, color: '#409EFF'},
+                                    {offset: 1, color: '#1f2d3d'}
+                                ]
+                            )
+                        },
+                        label: {
+                            show: true,
+                            position: 'top',
+                            color: '#fff',
+                            fontSize: 14,
+                            formatter: '{c}'
+                        },
+                    },
+                    {
+                        name: '常规数据',
+                        type: 'bar',
+                        data: [
+                            null, // KDA使用单独的系列
+                            data.DPM,
+                            data.DTPM,
+                            data.GPM
+                        ],
+                        barWidth: '50%',
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(
+                                0, 0, 0, 1,
+                                [
+                                    {offset: 0, color: '#ffd700'},
+                                    {offset: 1, color: '#8b5e3c'}
+                                ]
+                            )
+                        },
+                        label: {
+                            show: true,
+                            position: 'top',
+                            color: '#fff',
+                            fontSize: 14,
+                            formatter: '{c}'
+                        }
+                    },
+                   
+                ]
+            };
+
+            radarChart.setOption(radarOption);
+            barChart.setOption(barOption);
+        }
+
+        function navigate(direction) {
+            currentIndex = (currentIndex + direction + heroData.length) % heroData.length;
+            updateCharts(currentIndex);
+        }
+        function navigatejson(direction) {
+            chartIndex = (chartIndex + direction + 4) % 4;
+            updateCharts(currentIndex);
+        }
+
+        // 初始化加载
+        document.addEventListener('DOMContentLoaded', () => {
+            // Group选择器交互
+            document.querySelector('#group-label .group-selector').addEventListener('click', function(e) {
+                e.stopPropagation();
+                this.querySelector('.group-options').style.display = 'block';
+            });
+
+            document.querySelectorAll('#group-label .group-option').forEach(option => {
+                option.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    chartIndex = parseInt(this.dataset.group);
+                    loadData();
+                    this.closest('.group-options').style.display = 'none';
+                });
+            });
+
+            // 英雄列表交互
+            document.getElementById('hero-name').addEventListener('click', function(e) {
+                e.stopPropagation();
+                const heroList = document.getElementById('hero-list');
+                heroList.innerHTML = heroData.map((h, i) => 
+                    `<div class="hero-option" data-index="${i}">${h.英雄}</div>`
+                ).join('');
+                
+                const rect = this.getBoundingClientRect();
+                heroList.style.left = `${rect.left}px`;
+                heroList.style.top = `${rect.bottom + window.scrollY}px`;
+                heroList.style.display = 'block';
+            });
+
+            document.getElementById('hero-list').addEventListener('click', function(e) {
+                const target = e.target.closest('.hero-option');
+                if (target) {
+                    currentIndex = parseInt(target.dataset.index);
+                    updateCharts(currentIndex);
+                    this.style.display = 'none';
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.group-selector')) {
+                    document.querySelector('#group-label .group-options').style.display = 'none';
+                }
+                if (!e.target.closest('#hero-name, .hero-list')) {
+                    document.getElementById('hero-list').style.display = 'none';
+                }
+            });
+
+            // 原有的事件监听保持不变
+            document.getElementById('prev-btn').addEventListener('click', () => navigate(-1));
+            document.getElementById('next-btn').addEventListener('click', () => navigate(1));
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') navigate(-1);
+                if (e.key === 'ArrowRight') navigate(1);
+            });
+
+            loadData();
+        });
+
+        function navigate(direction) {
+            currentIndex = (currentIndex + direction + heroData.length) % heroData.length;
+            updateCharts(currentIndex);
+        }
+
+        // 窗口自适应
+        window.addEventListener('resize', () => {
+            radarChart.resize();
+            barChart.resize();
+        });
+    </script>
+</body>
+
+</html>

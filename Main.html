@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>英雄联盟战绩查询</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 70px 0 100px 60px;
+            font-family: 'FZDeSaiHeiS 512B';
+            font-size: x-large;
+            background: linear-gradient(45deg, #0a0a12, #1a1a2e);
+            color: #ffd700;
+            min-height: 100vh;
+        }
+
+        .header {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            z-index: 0;
+            
+        }
+
+        .header-text{
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            font-size: 75px;
+            text-shadow: 4px 4px 8px rgba(50, 51, 36, 0.5);
+            letter-spacing: 3px;
+        }
+
+        .header img{
+            display: block;
+            width: 100%;
+            opacity: .6;
+            mask-image: linear-gradient(to bottom,#fff 0,#fff 60%,#ffffff00 100%);
+            overflow-clip-margin: content-box;
+            overflow: clip;
+        }
+
+        .nav-container {
+            position: fixed;
+            left: 10px;
+            top: 50%;
+            height: 250px;
+            width: fit-content;
+            align-content: center;
+            transform: translateY(-50%);
+            padding: 5px;
+            background-color:#313a697a;
+            border:5px solid #663e0a;
+            border-radius: 10px;
+            z-index: 2;
+            box-shadow: 0 0 10px #ffd9007e;
+        }
+
+        .nav-text{
+            font-family: 'FZDeSaiHeiS 510M';
+            border: 5px;
+            font-size: larger;
+            text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.5);
+            letter-spacing: 1px;
+        }
+
+        .nav-button {
+            display: block;
+            width: 90%;
+            height: 40px;
+            margin: 15px 0;
+            background: #a37f3f;
+            margin-left: 5%;
+            margin-right: 5%;
+            border: 2px solid #c8aa6e;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: '等线';
+            font-weight: bold;
+            font-size: medium;
+            line-height: 100%;
+            color: #ffffff;
+            box-shadow: 0 0 5px rgb(177, 191, 206, 0.2);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .nav-button:hover {
+            background: #c8aa6e;
+            transform: scale(1.2);
+        }
+
+        .iframe-container {
+            position: relative;
+            z-index: 1;
+            top: 120px;
+            margin: 20px auto;
+            width: 85%;
+            padding: 20px;
+            background: linear-gradient(145deg, #1e2328, #2a2f35);
+            border: 3px solid #785a28;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(200, 170, 110, 0.3);
+        }
+
+        iframe {
+            width: 100%;
+            height: 900px;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: rgba(30, 35, 40, 0.9);
+            padding: 15px;
+            text-align: center;
+            border-top: 2px solid #785a28;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            left: 0;
+            z-index: 2;
+        }
+
+        .social-links a {
+            color: #c8aa6e;
+            text-decoration: none;
+            margin: 0 10px;
+            transition: color 0.3s;
+        }
+
+        .social-links a:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        
+        <div>
+            <img src="assets/backgroundpic.webp">
+        </div>
+    </div>
+    <div class="header-text">英雄联盟Sprite小组赛数据</div>
+    <div class="nav-container">
+        <div class="nav-text">导航栏</div>
+        <button class="nav-button" onclick="scrollToSection(0)" >战力图</button>
+        <button class="nav-button" onclick="scrollToSection(1)" >胜选比</button>
+        <button class="nav-button" onclick="scrollToSection(2)" ></button>
+    </div>
+
+    <div class="iframe-container">
+        <iframe src="show.html" id="section0"></iframe>
+    </div>
+
+    <div class="iframe-container">
+        <iframe src="show2.html" id="section1"></iframe>
+    </div>
+
+    <div class="iframe-container">
+        <iframe src="equipment-analysis.html" id="section2"></iframe>
+    </div>
+
+    <div class="footer">
+        <div id="current-time"></div>
+        <div>客服电话:400-123-4567</div>
+        <div class="social-links">
+            <a href="#">微信分享</a>
+            <a href="#">QQ分享</a>
+            <a href="#">微博分享</a>
+        </div>
+    </div>
+
+    <script>
+        function scrollToSection(index) {
+            const sections = document.querySelectorAll('.iframe-container');
+            if (sections[index]) {
+                const element = sections[index];
+                const offset = 510; // 与header高度匹配
+
+                window.scrollTo({
+                    behavior: 'smooth',
+                    top: element.offsetTop - (window.innerHeight / 2) + offset,
+                });
+            }
+        }
+        // 更新时间
+        function updateTime() {
+            const timeElement = document.getElementById('current-time');
+            const now = new Date();
+            timeElement.textContent = now.toLocaleString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+    </script>
+</body>
+
+</html>
