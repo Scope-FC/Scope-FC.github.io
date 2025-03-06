@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>选手数据看板</title>
+    <script src="https://cdn.staticfile.org/echarts/5.4.2/echarts.min.js"></script>
+    <style>
+        /* 修改标题样式 */
+        #title {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            font-family: 'FZDeSaiHeiS 510M';
+            color: #c62828;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 0;
+            z-index: 1000;
+            border-bottom: 2px solid rgba(198, 40, 40, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a, #2a1e1e);
+            color: #fff;
+            min-height: 70vh;
+        }
+
+        #header {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 1px solid rgba(198, 40, 40, 0.3);
+            z-index: 100;
+            cursor: pointer;
+        }
+
+        #player-name {
+            font-size: 24px;
+            font-family: '.PingFang SC';
+            font-weight: bold;
+            color: #ef5350;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+
+        #player-info {
+            font-size: 16px;
+            font-family: '.PingFang SC';
+            color: #ff7043;
+            cursor: pointer;
+        }
+
+        /* 横向Group按钮 */
+        .group-selector {
+            position: fixed;
+            top: 100px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .group-button {
+            padding: 8px 20px;
+            background: #2a1e1e;
+            border: 1px solid #c62828;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .group-button:hover {
+            background: #c62828;
+            transform: translateY(-2px);
+        }
+
+        .group-button.active {
+            background: #c62828;
+            box-shadow: 0 0 10px rgba(198, 40, 40, 0.5);
+        }
+
+        .nav-button {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #c62828;
+            color: #ef5350;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .nav-button:hover {
+            background: rgba(198, 40, 40, 0.2);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        #prev-btn {
+            left: 20px;
+        }
+
+        #next-btn {
+            right: 20px;
+        }
+
+        .chart-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-top: 200px;
+        }
+
+        .chart-box {
+            flex: 1;
+            min-width: 600px;
+            height: 600px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #c62828;
+        }
+
+        .player-list {
+            display: none;
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #c62828;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 200;
+        }
+
+        .player-option {
+            padding: 8px 12px;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .player-option:hover {
+            background: rgba(198, 40, 40, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="title">选手战力图</div>
+    <div id="header">
+        <div id="player-name"></div>
+        <div id="player-info"></div>
+    </div>
+
+    <div class="nav-button" id="prev-btn">◄</div>
+    <div class="nav-button" id="next-btn">►</div>
+
+    <div class="chart-container">
+        <div class="chart-box" id="radar-chart"></div>
+        <div class="chart-box" id="bar-chart"></div>
+    </div>
+
+    <div id="player-list" class="player-list"></div>
+
+    <!-- 修改后的Group选择器 -->
+    <div class="group-selector">
+        <div class="group-button active" data-group="0">Group A</div>
+        <div class="group-button" data-group="1">Group B</div>
+        <div class="group-button" data-group="2">Group C</div>
+        <div class="group-button" data-group="3">Group D</div>
+    </div>
+
+    <script>
+        // 全局变量
+        let playerData = [];
+        let currentIndex = 0;
+        let chartIndex = 0;
+        let radarChart, barChart;
+        const paths = [
+            'LOL_Player-2025-Split1-GroupA.json',
+            'LOL_Player-2025-Split1-GroupB.json',
+            'LOL_Player-2025-Split1-GroupC.json',
+            'LOL_Player-2025-Split1-GroupD.json'
+        ];
+
+        // 初始化图表
+        function initCharts() {
+            if (radarChart) radarChart.dispose();
+            if (barChart) barChart.dispose();
+            radarChart = echarts.init(document.getElementById('radar-chart'));
+            barChart = echarts.init(document.getElementById('bar-chart'));
+        }
+
+        // 加载数据
+        async function loadData() {
+            try {
+                const response = await fetch(paths[chartIndex]);
+                playerData = await response.json();
+                currentIndex = 0;
+                initCharts();
+                updateCharts(currentIndex);
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                alert('无法加载数据，请检查网络连接或数据文件');
+            }
+        }
+
+        // 更新头部信息
+        function updateHeader(player) {
+            document.getElementById('player-name').textContent = player.Player;
+            document.getElementById('player-info').textContent = `${player.Team} | 胜率：${(player.Winrate * 100).toFixed(1)}%`;
+        }
+
+        // 更新图表
+        function updateCharts(index) {
+            const data = playerData[index];
+
+            updateHeader(data);
+            //document.getElementById('group-value').textContent = data.Group;
+
+            // 雷达图配置
+            const radarOption = {
+                title: {
+                    text: `${data.Player} 核心数据`,
+                    left: 'center',
+                    textStyle: {
+                        color: '#ef5350',
+                        fontSize: 18
+                    }
+                },
+                radar: {
+                    indicator: [
+                        { name: `胜率\n${(data.Winrate * 100).toFixed(1)}%`, max: 1, color: '#fff9' },
+                        { name: `KDA\n${data.KDA.toFixed(1)}`, max: 10, color: '#fff9' },
+                        { name: `一血率\n${(data.FirstBlood * 100).toFixed(1)}%`, max: 1, color: '#fff9' },
+                        { name: `一塔率\n${(data.FirstTower * 100).toFixed(1)}%`, max: 1, color: '#fff9' },
+                        { name: `DPM\n${data.DPM}`, max: 1000, color: '#fff9' },
+                        { name: `DTPM\n${data.DTPM}`, max: 1000, color: '#fff9' },
+                        { name: `GPM\n${data.GPM}`, max: 1000, color: '#fff9' }
+                    ],
+                    axisLine: { lineStyle: { color: 'rgba(239,83,80,0.2)' } },
+                    splitLine: { lineStyle: { color: 'rgba(239,83,80,0.1)' } },
+                    axisLabel: { fontSize: '12' }
+                },
+                series: [{
+                    type: 'radar',
+                    data: [{
+                        value: [
+                            data.Winrate,
+                            data.KDA,
+                            data.FirstBlood,
+                            data.FirstTower,
+                            data.DPM,
+                            data.DTPM,
+                            data.GPM
+                        ],
+                        name: '核心数据',
+                        areaStyle: { color: 'rgba(239,83,80,0.3)' },
+                        lineStyle: { color: '#ef5350', width: 2 },
+                        itemStyle: { color: '#c62828' }
+                    }]
+                }]
+            };
+
+            // 柱状图配置
+            const barOption = {
+                title: {
+                    text: '详细数据统计',
+                    left: 'center',
+                    textStyle: {
+                        color: '#ef5350',
+                        fontSize: 18
+                    }
+                },
+                tooltip: { trigger: 'axis' },
+                xAxis: {
+                    type: 'category',
+                    data: ['击杀', '死亡', '助攻', 'CSPM', 'DPGR'],
+                    axisLabel: { color: '#fff9', fontSize: 14 }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '击杀/死亡/助攻',
+                        axisLabel: { color: '#ef5350' },
+                        splitLine: { show: false },
+                        position: 'left'
+                    },
+                    {
+                        type: 'value',
+                        name: 'CSPM/DPGR',
+                        axisLabel: { color: '#c62828' },
+                        position: 'right'
+                    }
+                ],
+                series: [
+                    {
+                        name: '数据',
+                        type: 'bar',
+                        yAxisIndex: 1,
+                        data: [
+                            data.Kill,
+                            data.Death,
+                            data.Assist,
+                            null,
+                            null
+                        ],
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(
+                                0, 0, 0, 1,
+                                [
+                                    { offset: 0, color: '#c62828' },
+                                    { offset: 1, color: '#2a1e1e' }
+                                ]
+                            )
+                        }
+                    },
+                    {
+                        name: '数据',
+                        type: 'bar',
+                        data: [
+                            null,
+                            null,
+                            null,
+                            data.CSPM,
+                            data.DPGR
+                        ],
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(
+                                0, 0, 0, 1,
+                                [
+                                    { offset: 0, color: '#12feff' },
+                                    { offset: 1, color: '#1156ac' }
+                                ]
+                            )
+                        }
+                    }
+                ]
+            };
+
+            radarChart.setOption(radarOption);
+            barChart.setOption(barOption);
+        }
+
+        // 导航功能
+        function navigate(direction) {
+            currentIndex = (currentIndex + direction + playerData.length) % playerData.length;
+            updateCharts(currentIndex);
+        }
+
+        // Group按钮点击处理
+        document.querySelectorAll('.group-button').forEach(button => {
+            button.addEventListener('click', function () {
+                // 移除所有激活状态
+                document.querySelectorAll('.group-button').forEach(btn =>
+                    btn.classList.remove('active'));
+
+                // 设置当前激活状态
+                this.classList.add('active');
+                chartIndex = parseInt(this.dataset.group);
+                loadData();
+            });
+        });
+
+        // 初始化事件
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // 选手列表
+            document.getElementById('player-name').addEventListener('click', function (e) {
+                e.stopPropagation();
+                const list = document.getElementById('player-list');
+                list.innerHTML = playerData.map((p, i) =>
+                    `<div class="player-option" data-index="${i}">${p.Player}</div>`
+                ).join('');
+
+                const rect = this.getBoundingClientRect();
+                list.style.left = `${rect.left}px`;
+                list.style.top = `${rect.bottom}px`;
+                list.style.display = 'block';
+            });
+
+            document.getElementById('player-list').addEventListener('click', function (e) {
+                const target = e.target.closest('.player-option');
+                if (target) {
+                    currentIndex = parseInt(target.dataset.index);
+                    updateCharts(currentIndex);
+                    this.style.display = 'none';
+                }
+            });
+
+            // 全局点击
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.group-selector')) {
+                    document.querySelector('.group-options').style.display = 'none';
+                }
+                if (!e.target.closest('#player-name, #player-list')) {
+                    document.getElementById('player-list').style.display = 'none';
+                }
+            });
+
+            // 导航按钮
+            document.getElementById('prev-btn').addEventListener('click', () => navigate(-1));
+            document.getElementById('next-btn').addEventListener('click', () => navigate(1));
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') navigate(-1);
+                if (e.key === 'ArrowRight') navigate(1);
+            });
+
+            loadData();
+        });
+
+        // 窗口适配
+        window.addEventListener('resize', () => {
+            radarChart.resize();
+            barChart.resize();
+        });
+    </script>
+</body>
+
+</html>
